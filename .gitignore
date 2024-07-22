@@ -1,0 +1,9 @@
+node_modules
+.DS_Store
+dist
+logs
+
+# Editor directories and files
+.idea
+
+package-lock.json
