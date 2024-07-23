@@ -25,7 +25,7 @@
     ```
 
 ## 2.3 编辑配置文件
-- 在项目根目录下找到 `config.js` 文件，修改里面的配置信息
+- 在项目根目录下找到 `config.yaml` 文件，修改里面的配置信息
   - `base_url`: 修改为您需要交互的 BTC网络，可选值暂时为下面四个选项
     - `主网`: https://mempool.space/api
     - `Signet Test`: https://mempool.space/signet/api
