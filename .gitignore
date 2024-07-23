@@ -6,4 +6,6 @@ logs
 # Editor directories and files
 .idea
 
-package-lock.json
+config.yaml
+wallet.csv
+

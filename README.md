@@ -25,7 +25,7 @@
     ```
 
 ## 2.3 编辑配置文件
-- 在项目根目录下找到 `config.yaml` 文件，修改里面的配置信息
+- 复制 `config.yaml-example` 文件，粘贴名称为 `config.yaml` ，然后，修改里面 `config.yaml` 的配置信息
   - `base_url`: 修改为您需要交互的 BTC网络，可选值暂时为下面四个选项
     - `主网`: https://mempool.space/api
     - `Signet Test`: https://mempool.space/signet/api
@@ -35,6 +35,7 @@
 
 ## 2.4 编辑 `wallet.csv` 收款钱包文件
 - 在项目根目录下找到 `wallet.csv` 文件，编辑里面的收款钱包地址与金额，一行一个
+- - 复制 `wallet.csv-example` 文件，粘贴名称为 `wallet.csv` ，然后，编辑 `wallet.csv` 里面的收款钱包地址与金额，一行一个
 
 ## 2.5 执行脚本
 - 在项目根目录下执行如下命令，执行脚本
