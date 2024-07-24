@@ -7,3 +7,10 @@ base_url: "https://fractalbitcoin-mempool.unisat.io/api"
 # 暂时只支持 p2tr的地址 WIF，主网是bc1p开头，测试网是tb1p开头
 wif: ""
 
+# 设置的gas，可选值如下：(high medium low +n n)
+#   high: 获取区块链浏览器上的 高优先级
+#   medium: 获取区块链浏览器上的 中优先级
+#   low: 获取区块链浏览器上的 低优先级
+#   +n: n表示正整数，获取区块链浏览器上的 高优先级再加n，比如 +5，
+#   n: n表示正整数，直接用 n 做gas
+fee: "high"

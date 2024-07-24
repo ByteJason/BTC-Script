@@ -154,9 +154,37 @@ async function request({url, method = 'get', body = null, headers = null, agent 
 
 // 获取建议费用
 async function getGas() {
-    const url = `${URI}/v1/fees/recommended`;
-    const res = await request({url: url});
-    return res.data;
+    let gas = 0;
+    if (/^[1-9]\d*$/.test(config.fee)) {
+        gas = Number(config.fee)
+    } else {
+        const url = `${URI}/v1/fees/recommended`;
+        const result = await request({url: url});
+        const res = result.data;
+        logger().info(`当前gas (High Priority=${res.fastestFee} sat/vB), (Medium Priority=${res.halfHourFee} sat/vB), (Low Priority=${res.hourFee} sat/vB), (No Priority=${res.economyFee} sat/vB)`);
+        if (/^\+[1-9]\d*$/.test(config.fee)) {
+            gas = res.fastestFee + Number(config.fee);
+        } else {
+            switch (config.fee) {
+                case "medium":
+                    gas = res.halfHourFee;
+                    break;
+                case "low":
+                    gas = res.hourFee;
+                    break;
+                case "high":
+                    gas = res.fastestFee;
+                    break;
+                default:
+                    logger().warn(`config.yaml 的 gas 设置有误，默认使用 high`);
+                    gas = res.fastestFee;
+                    break;
+            }
+        }
+    }
+
+    logger().info(`使用gas ${gas}`);
+    return gas;
 }
 
 function getKeyPairByMnemonic(mnemonic) {
@@ -269,9 +297,8 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
     }
 
     const gas = await getGas();
-    logger().info(`当前gas (High Priority=${gas.fastestFee} sat/vB), (Medium Priority=${gas.halfHourFee} sat/vB), (Low Priority=${gas.hourFee} sat/vB), (No Priority=${gas.economyFee} sat/vB)`);
     // 设置 gas
-    const fee = gas.fastestFee * (10 + (toAddresses.length + 1) * 43 + psbt.data.inputs.length * 148);
+    const fee = gas * (10 + (toAddresses.length + 1) * 43 + psbt.data.inputs.length * 148);
 
     // 找零输出
     const changeValue = inputValue - outputValue - fee;
@@ -329,15 +356,10 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
     rl.close();
 
     if (answer === 'Y' || answer === 'y') {
-        logger().info('正在广播交易');
         // 广播交易到比特币网络，等待确认
         logger().info(`正在广播交易 hex: ${psbtHex}`);
         const res = await broadcastTx(psbtHex);
-
         logger().success(`Transaction: ${res}`);
-
-        // dd(`hash:${res}, fromAddress:${fromAddress}, sendAmount:${sendAmount}, toAddress:${toAddress}`, 'success');
-
         return true;
     }
     logger().warn('取消广播交易');
