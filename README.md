@@ -15,17 +15,17 @@
 - 安装 nodejs >= 18.18 的版本
     - 可以在 [https://nodejs.org/](https://nodejs.org/zh-cn/download/package-manager) 进行下载适合系统的环境安装包进行安装
 - 安装好之后使用如下命令查看是否成功安装，如果都能看到版本号信息，既代表安装完成
-    - ```
-    node -v
-    npm -v
-    ```
+    - ```shell
+      node -v
+      npm -v
+      ```
 
 ## 2.2 安装依赖
 
 - 在项目根目录下执行如下命令，安装依赖
     - ```
-    npm install
-    ```
+      npm install
+      ```
 
 ## 2.3 编辑配置文件
 
@@ -53,8 +53,8 @@
 
 - 在项目根目录下执行如下命令，执行脚本
     - ```shell
-    node transfer.js
-    ```
+      node transfer.js
+      ```
 
 # 商用注意事项
 
