@@ -1,4 +1,6 @@
 const {createLogger, transports, format} = require('winston');
+const bitcoin = require('bitcoinjs-lib');
+
 
 /**
  * 睡眠
@@ -167,6 +169,43 @@ function logger() {
     return newLogger;
 }
 
+/**
+ * 验证比特币地址的合法性
+ * @param {string} address - 要验证的比特币地址
+ * @param network
+ * @returns {boolean} - 返回地址是否合法
+ */
+function isValidBitcoinAddress(address, network) {
+    try {
+        // 解析比特币地址
+        const decoded = bitcoin.address.fromBech32(address);
+
+        // 检查地址前缀和版本号
+        if (network === bitcoin.networks.bitcoin) {
+            if (decoded.prefix !== 'bc') return false;
+        } else if (network === bitcoin.networks.testnet) {
+            if (decoded.prefix !== 'tb') return false;
+        } else {
+            return false;
+        }
+
+        // 检查数据部分的长度和类型
+        if (address.startsWith('bc1p')) {
+            // P2TR 地址的版本号为 1，数据长度为 32 字节
+            return decoded.version === 1 && decoded.data.length === 32;
+        } else if (address.startsWith('bc1q')) {
+            // P2WPKH 地址的版本号为 0，数据长度为 20 字节
+            // P2WSH 地址的版本号为 0，数据长度为 32 字节
+            return decoded.version === 0 && (decoded.data.length === 20 || decoded.data.length === 32);
+        }
+
+        return false;
+    } catch (e) {
+        // 捕获解析错误，返回地址不合法
+        return false;
+    }
+}
+
 module.exports = {
     sleep,
     randomNumber,
@@ -175,5 +214,6 @@ module.exports = {
     dd,
     shortAddress,
     logger,
+    isValidBitcoinAddress,
 }
 
