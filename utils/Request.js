@@ -110,14 +110,23 @@ class Request {
 
     // 广播交易
     async broadcastTx(psbtHex) {
-        const url = `${this.URI}/tx`;
-
-        const res = await this.request({
-            url: url, method: 'post', body: psbtHex, headers: {
-                'Content-Type': 'text/plain'
-            }
-        });
-        return res.data;
+        if (this.networkType === "fractal") {
+            const url = `https://mempool.fractalbitcoin.io/api/tx`;
+            const res = await this.request({
+                url: url, method: 'post', body: psbtHex, headers: {
+                    'Content-Type': 'text/plain'
+                }
+            });
+            return res.data;
+        } else {
+            const url = `${this.URI}/tx`;
+            const res = await this.request({
+                url: url, method: 'post', body: psbtHex, headers: {
+                    'Content-Type': 'text/plain'
+                }
+            });
+            return res.data;
+        }
     }
 
     async request({url, method = 'get', body = null, headers = null, agent = null}) {
