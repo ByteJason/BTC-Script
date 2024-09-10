@@ -24,6 +24,7 @@ class Config {
                 network = bitcoin.networks.testnet;
                 break;
             case "https://mempool.fractalbitcoin.io/api":
+            case "https://mempool.fractalbitcoin.io/api":
             case "https://fractalbitcoin-mempool.unisat.io/api":
                 networkType = "fractal";
                 network = bitcoin.networks.bitcoin;
