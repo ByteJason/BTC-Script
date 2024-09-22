@@ -46,7 +46,7 @@ class Request {
     // 查询 UTXO
     async getUTXO(address) {
         if (this.networkType === "fractal") {
-            const url = `https://wallet-api-fractalbitcoin.unisat.space/v5/address/btc-utxo?address=${address}`;
+            const url = `https://wallet-api-fractal.unisat.io/v5/address/btc-utxo?address=${address}`;
             const res = await this.request({url: url});
             if (res.status === 200 && res.data && res.data.code === 0) {
                 return res.data.data;
