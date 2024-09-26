@@ -18,6 +18,8 @@ class Request {
     async getBalance(address) {
         const url = `${this.URI}/address/${address}`;
 
+        console.log(url);
+
         const res = await this.request({url: url});
         // funded_txo_sum - spent_txo_sum 就是可用余额
         //{
@@ -46,7 +48,13 @@ class Request {
     // 查询 UTXO
     async getUTXO(address) {
         if (this.networkType === "fractal") {
-            const url = `https://wallet-api-fractalbitcoin.unisat.space/v5/address/btc-utxo?address=${address}`;
+            const url = `https://wallet-api-fractal.unisat.io/v5/address/btc-utxo?address=${address}`;
+            const res = await this.request({url: url});
+            if (res.status === 200 && res.data && res.data.code === 0) {
+                return res.data.data;
+            }
+        } else if (this.networkType === "fractal_test") {
+            const url = `https://wallet-api-fractal-testnet.unisat.io/v5/address/btc-utxo?address=${address}`;
             const res = await this.request({url: url});
             if (res.status === 200 && res.data && res.data.code === 0) {
                 return res.data.data;
@@ -111,10 +119,27 @@ class Request {
     // 广播交易
     async broadcastTx(psbtHex) {
         if (this.networkType === "fractal") {
-            const url = `https://mempool.fractalbitcoin.io/api/tx`;
+            const url = `https://wallet-api-fractal.unisat.io/v5/tx/broadcast`;
             const res = await this.request({
-                url: url, method: 'post', body: psbtHex, headers: {
-                    'Content-Type': 'text/plain'
+                url: url, method: 'post', body: {
+                    "rawtx": psbtHex,
+                }, headers: {
+                    'Content-Type': 'application/json',
+                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+                    'x-address': 'bc1pasj6k7p8hy4zqpr7652svs7zq20v4zr50xy9423r4330al5r7u7qaxvy08',
+                }
+            });
+            return res.data;
+        }
+        if (this.networkType === "fractal_test") {
+            const url = `https://wallet-api-fractal-testnet.unisat.io/v5/tx/broadcast`;
+            const res = await this.request({
+                url: url, method: 'post', body: {
+                    "rawtx": psbtHex,
+                }, headers: {
+                    'Content-Type': 'application/json',
+                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+                    'x-address': 'bc1pasj6k7p8hy4zqpr7652svs7zq20v4zr50xy9423r4330al5r7u7qaxvy08',
                 }
             });
             return res.data;
