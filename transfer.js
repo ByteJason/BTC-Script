@@ -3,7 +3,7 @@ const bip39 = require('bip39');
 const ecc = require('tiny-secp256k1');
 const bitcoin = require('bitcoinjs-lib');
 const {ECPairFactory} = require('ecpair');
-const {logger, isValidBitcoinAddress} = require("./utils/function");
+const {logger, isValidBitcoinAddress, randomNumber} = require("./utils/function");
 const AddressDataClass = require("./utils/AddressData");
 const Request = require("./utils/Request");
 const ConfigClass = require("./utils/Config");
@@ -176,7 +176,7 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
         // 广播交易到比特币网络，等待确认
         logger().info(`正在广播交易 hex: ${psbtHex}`);
         const res = await request.broadcastTx(psbtHex);
-        logger().success(`Transaction: ${res}`);
+        logger().success(`Transaction: ` + JSON.stringify(res));
         return true;
     }
     logger().warn('取消广播交易');
@@ -196,7 +196,7 @@ async function main() {
 
     let balance = await request.getBalance(fromAddress);
     let balanceSATS = 0;
-    if(balance && balance.chain_stats){
+    if (balance && balance.chain_stats) {
         balanceSATS = balance.chain_stats.funded_txo_sum - balance.chain_stats.spent_txo_sum;
         logger().info(`支出账户: ${fromAddress} 余额: ${balanceSATS} sat, ${balanceSATS / exchangeRate} BTC`);
     } else {
@@ -211,7 +211,7 @@ async function main() {
             return
         }
         const amountSATS = parseInt(Amount * exchangeRate);
-        if(amountSATS<=0){
+        if (amountSATS <= 0) {
             logger().error(`请检查第${parseInt(index) + 2}行地址: ${Address} 的金额是否正确`);
             return
         }
