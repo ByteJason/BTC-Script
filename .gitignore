@@ -8,4 +8,5 @@ logs
 
 config.yaml
 wallet.csv
+*.csv
 
