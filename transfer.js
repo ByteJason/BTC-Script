@@ -152,14 +152,15 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
     psbt.finalizeAllInputs();
 
     // 提取交易事务
-    const psbtHex = psbt.extractTransaction().toHex();
+    const tx = psbt.extractTransaction();
+    const psbtHex = tx.toHex();
 
     const psbtSize = Buffer.from(psbtHex, 'hex').length;
 
     let msg = `\n支出账户: ${fromAddress} 使用了 ${psbt.data.inputs.length} 条 UTXO 作为输入（已经排除了UTXO值小于546的，避免误烧资产）\n`;
     msg += `${utxoStr}`;
     msg += `接收账户数量 ${toAddresses.length} 个地址，共 ${toAmountSATSAll / exchangeRate} BTC ( ${toAmountSATSAll} sat )\n`;
-    msg += `矿工费用: ${fee / exchangeRate} BTC ( ${fee} sat )  gas: ${gas} sat/vB 虚拟大小: ${psbtSize}\n`;
+    msg += `矿工费用: ${fee / exchangeRate} BTC ( ${fee} sat )  gas: ${gas} sat/vB 虚拟大小: ${tx.virtualSize()}\n`;
     msg += `找零 ${changeValue / exchangeRate} BTC ( ${changeValue} sat ) 到 ${fromAddress}\n`;
     console.log(`\x1b[33m${msg}\x1b[39m`);
 
