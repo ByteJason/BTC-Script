@@ -1,9 +1,10 @@
 # url可选值
 # 主网: https://mempool.space/api
-# Fractal 主网: https://mempool.fractalbitcoin.io/api
 # Signet: https://mempool.space/signet/api
 # Testnet3: https://mempool.space/testnet/api
-base_url: "https://fractalbitcoin-mempool.unisat.io/api"
+# fractal: https://mempool.fractalbitcoin.io/api
+# fractalTestnet: https://mempool-testnet.fractalbitcoin.io/api
+base_url: "https://mempool.fractalbitcoin.io/api"
 
 # 暂时只支持 p2tr的地址 WIF，主网是bc1p开头，测试网是tb1p开头
 wif: ""

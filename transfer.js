@@ -3,7 +3,7 @@ const bip39 = require('bip39');
 const ecc = require('tiny-secp256k1');
 const bitcoin = require('bitcoinjs-lib');
 const {ECPairFactory} = require('ecpair');
-const {logger, isValidBitcoinAddress} = require("./utils/function");
+const {logger, isValidBitcoinAddress, randomNumber} = require("./utils/function");
 const AddressDataClass = require("./utils/AddressData");
 const Request = require("./utils/Request");
 const ConfigClass = require("./utils/Config");
@@ -37,6 +37,30 @@ function getKeyPairByMnemonic(mnemonic) {
 
 function getKeyPairByPrivateKey(privateKey) {
     return ECPairFactory(ecc).fromWIF(privateKey, network);
+}
+
+/**
+ * 计算转账的交易权重
+ * @param inputCount
+ * @param outputCount
+ * @returns {*}
+ */
+function calculateWeight(inputCount, outputCount) {
+    // 定义每个部分的大小（以字节为单位）
+    const baseTransactionSize = 10;    // 包含版本号和锁定时间，通常为10字节
+    const inputNonWitnessSize = 70;    // 每个输入的非 Witness 大小
+    const outputSize = 58;             // 每个输出的大小
+
+    let nonWitnessSize = baseTransactionSize + (inputCount * inputNonWitnessSize) + (outputCount * outputSize);
+
+    // TODO: 需要根据地址类型判断大小
+    // Witness 数据大小
+    const p2wpkhWitnessDataSize = 105; // 普通 P2WPKH Witness 数据大小（签名 + 公钥）
+    const p2trWitnessDataSize = 64;    // P2TR Witness 数据大小（Schnorr 签名）
+    let totalWitnessSize = inputCount * p2trWitnessDataSize; // 计算 Witness 大小
+
+    // 计算交易的总 weight
+    return 3 * nonWitnessSize + totalWitnessSize;
 }
 
 // 转账
@@ -115,13 +139,14 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
 
     const gas = await request.getGas();
     // 设置 gas
-    const fee = gas * (10 + (toAddresses.length + 1) * 43 + psbt.data.inputs.length * 148);
+    const fee = gas * Math.ceil(calculateWeight(psbt.data.inputs.length, toAddresses.length + 1) / 4);
+    console.log(Math.ceil(calculateWeight(psbt.data.inputs.length, toAddresses.length + 1) / 4));
 
     // 找零输出
     const changeValue = inputValue - outputValue - fee;
 
     if (changeValue < 0) {
-        logger().error('可用 UTXO 不足');
+        logger().error('支出超过输出的 UTXO');
         return;
     } else if (changeValue > 0) {
         // 找零
@@ -152,14 +177,13 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
     psbt.finalizeAllInputs();
 
     // 提取交易事务
-    const psbtHex = psbt.extractTransaction().toHex();
-
-    const psbtSize = Buffer.from(psbtHex, 'hex').length;
+    const tx = psbt.extractTransaction();
+    const psbtHex = tx.toHex();
 
     let msg = `\n支出账户: ${fromAddress} 使用了 ${psbt.data.inputs.length} 条 UTXO 作为输入（已经排除了UTXO值小于546的，避免误烧资产）\n`;
     msg += `${utxoStr}`;
     msg += `接收账户数量 ${toAddresses.length} 个地址，共 ${toAmountSATSAll / exchangeRate} BTC ( ${toAmountSATSAll} sat )\n`;
-    msg += `矿工费用: ${fee / exchangeRate} BTC ( ${fee} sat )  gas: ${gas} sat/vB 虚拟大小: ${psbtSize}\n`;
+    msg += `矿工费用: ${fee / exchangeRate} BTC ( ${fee} sat )  gas: ${gas} sat/vB 虚拟大小: ${tx.virtualSize()}\n`;
     msg += `找零 ${changeValue / exchangeRate} BTC ( ${changeValue} sat ) 到 ${fromAddress}\n`;
     console.log(`\x1b[33m${msg}\x1b[39m`);
 
@@ -176,7 +200,7 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
         // 广播交易到比特币网络，等待确认
         logger().info(`正在广播交易 hex: ${psbtHex}`);
         const res = await request.broadcastTx(psbtHex);
-        logger().success(`Transaction: ${res}`);
+        logger().success(`Transaction: ` + JSON.stringify(res));
         return true;
     }
     logger().warn('取消广播交易');
@@ -196,7 +220,7 @@ async function main() {
 
     let balance = await request.getBalance(fromAddress);
     let balanceSATS = 0;
-    if(balance && balance.chain_stats){
+    if (balance && balance.chain_stats) {
         balanceSATS = balance.chain_stats.funded_txo_sum - balance.chain_stats.spent_txo_sum;
         logger().info(`支出账户: ${fromAddress} 余额: ${balanceSATS} sat, ${balanceSATS / exchangeRate} BTC`);
     } else {
@@ -211,7 +235,7 @@ async function main() {
             return
         }
         const amountSATS = parseInt(Amount * exchangeRate);
-        if(amountSATS<=0){
+        if (amountSATS <= 0) {
             logger().error(`请检查第${parseInt(index) + 2}行地址: ${Address} 的金额是否正确`);
             return
         }
