@@ -5,37 +5,52 @@ const bitcoin = require("bitcoinjs-lib");
 class Config {
     constructor(filePath = "config.yaml") {
         this.data = yaml.load(fs.readFileSync(filePath, 'utf8'));
+        this.networkType = this.data.networkType;
 
-        this.URI = this.data.base_url;
-
-        let network = "";
-        let networkType = "";
-        switch (this.data.base_url) {
-            case "https://mempool.space/api":
-                networkType = "bitcoin";
-                network = bitcoin.networks.bitcoin;
+        switch (this.data.networkType) {
+            case "mainnet":
+            default:
+                this.networkType = "mainnet";
+                this.unisatWalletUri = "https://wallet-api.unisat.io";
+                this.mempoolUri = "https://mempool.space";
+                this.network = bitcoin.networks.bitcoin;
                 break;
-            case "https://mempool.space/signet/api":
-                networkType = "signet";
-                network = bitcoin.networks.testnet;
+            case "testnet":
+                this.unisatWalletUri = "https://wallet-api-testnet.unisat.io";
+                this.mempoolUri = "https://mempool.space/testnet";
+                this.network = bitcoin.networks.testnet;
                 break;
-            case "https://mempool.space/testnet/api":
-                networkType = "testnet";
-                network = bitcoin.networks.testnet;
+            case "testnet4":
+                this.unisatWalletUri = "https://wallet-api-testnet4.unisat.io";
+                this.mempoolUri = "https://mempool.space/testnet4";
+                this.network = bitcoin.networks.testnet;
                 break;
-            case "https://mempool.fractalbitcoin.io/api":
-            case "https://fractalbitcoin-mempool.unisat.io/api":
-                networkType = "fractal";
-                network = bitcoin.networks.bitcoin;
+            case "signet":
+                this.unisatWalletUri = "https://wallet-api-signet.unisat.io";
+                this.mempoolUri = "https://mempool.space/signet";
+                this.network = bitcoin.networks.testnet;
                 break;
-            case "https://mempool-testnet.fractalbitcoin.io/api":
-                networkType = "fractal_test";
-                network = bitcoin.networks.bitcoin;
+            case "fractal":
+                this.unisatWalletUri = "https://wallet-api-fractal.unisat.io";
+                this.mempoolUri = "https://mempool.fractalbitcoin.io";
+                this.network = bitcoin.networks.bitcoin;
+                break;
+            case "fractal-testnet":
+                this.unisatWalletUri = "https://wallet-api-fractal-testnet.unisat.io";
+                this.mempoolUri = "https://mempool-testnet.fractalbitcoin.io";
+                this.network = bitcoin.networks.bitcoin;
                 break;
         }
 
-        this.network = network;
-        this.networkType = networkType;
+        switch (this.data.addressType) {
+            case "p2tr":
+            case "p2wpkh":
+                this.addressType = this.data.addressType;
+                break;
+            default:
+                this.addressType = "p2tr";
+                break;
+        }
     }
 }
 

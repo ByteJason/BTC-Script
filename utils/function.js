@@ -1,6 +1,14 @@
 const {createLogger, transports, format} = require('winston');
 const bitcoin = require('bitcoinjs-lib');
+const bip39 = require("bip39");
+const bip32 = require("bip32");
 
+const ecc = require("tiny-secp256k1");
+const {ECPairFactory} = require("ecpair");
+
+bitcoin.initEccLib(ecc);
+
+const exchangeRate = 1e8;
 
 /**
  * 睡眠
@@ -169,6 +177,49 @@ function logger() {
     return newLogger;
 }
 
+function getKeyPairByMnemonic(mnemonic, network, addressType = 'p2tr') {
+    // 通过助记词生成种子
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    // 通过种子生成根秘钥
+    const root = bip32.BIP32Factory(ecc).fromSeed(seed, network);
+    // 定义路径
+    const path = addressType === 'p2tr' ? "m/86'/0'/0'/0/0" : "m/84'/0'/0'/0/0";
+    // 通过路径生成密钥对
+    const childNode = root.derivePath(path);
+
+    // keyPairInstance
+    return ECPairFactory(ecc).fromPrivateKey(childNode.privateKey, {network});
+}
+
+function isValidWif(wif) {
+    const wifRegex = /^[LKc][1-9A-HJ-NP-Za-km-z]{51}$/;
+    return wifRegex.test(wif);
+}
+
+function getKeyPairByWif(wifString, network) {
+    return ECPairFactory(ecc).fromWIF(wifString, network);
+}
+
+const toXOnly = (pubKey) => pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
+
+function getAddress(wifString, addressType, network) {
+    const keyPair = getKeyPairByWif(wifString);
+
+    let fromAddress = "";
+    if (addressType === "p2tr") {
+        const p2tr = bitcoin.payments.p2tr({internalPubkey: toXOnly(keyPair.publicKey), network});
+        fromAddress = p2tr.address;
+    } else if (addressType === "p2wpkh") {
+        const p2wpkh = bitcoin.payments.p2wpkh({pubkey: keyPair.publicKey, network});
+        fromAddress = p2wpkh.address;
+    } else {
+        logger().error(`config.yaml 的 addressType 设置有误， ${addressType}`);
+    }
+
+    return fromAddress
+}
+
+
 /**
  * 验证比特币地址的合法性
  * @param {string} address - 要验证的比特币地址
@@ -215,5 +266,10 @@ module.exports = {
     shortAddress,
     logger,
     isValidBitcoinAddress,
+    getKeyPairByWif,
+    toXOnly,
+    getAddress,
+    isValidWif,
+    exchangeRate,
 }
 

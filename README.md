@@ -30,18 +30,23 @@
 ## 2.3 编辑配置文件
 
 - 复制 `config.yaml-example` 文件，粘贴名称为 `config.yaml` ，然后，修改里面 `config.yaml` 的配置信息
-    - `base_url`: 修改为您需要交互的 BTC网络，可选值暂时为下面四个选项
-        - `主网`: https://mempool.space/api
-        - `Signet Test`: https://mempool.space/signet/api
-        - `Testnet3`: https://mempool.space/testnet/api
-        - `Fractal`: https://fractalbitcoin-mempool.unisat.io/api
-    - `wif`: 需要支出的 BTC P2TR地址（主网是bc1p开头，测试网是tb1p开头）的 `WIF` 私钥
-    - `fee`: 转账时交易的矿工费，可选值如下：(high medium low +n n)
+    - `networkType`: 修改为您需要交互的 BTC 网络，可选值暂时为下面六个选项
+        - `mainnet`: BTC 主网
+        - `testnet`: BTC testnet测试网
+        - `testnet4`: BTC testnet4测试网
+        - `signet`: BTC signet测试网
+        - `fractal`: Fractal 分型比特币主网
+        - `fractal-testnet`: Fractal 分型比特币测试网
+    - `wif`: 需要支出的 BTC P2TR 或 p2wpkh 地址的 `WIF` 私钥
+    - `addressType`: WIF 私钥对应的地址类型，可选值如下
+      - `p2tr`: WIF 私钥对应的地址类型为 `p2tr`，即 `bc1p` 开头的地址
+      - `p2wpkh`: WIF 私钥对应的地址类型为 `p2wpkh`，即 `bc1q` 开头的地址
+    - `gas`: 转账时交易的矿工费，可选值如下：(high medium low +n n)
         - `high`: 获取区块链浏览器上的 高优先级
         - `medium`: 获取区块链浏览器上的 中优先级
         - `low`: 获取区块链浏览器上的 低优先级
         - `+n`: n表示正整数，获取区块链浏览器上的 高优先级再加n，比如 +5
-        - `n`: n表示正整数，直接用 n 做gas
+        - `n`: n表示正整数，直接用 n 做 gas
 
 ## 2.4 编辑 `wallet.csv` 收款钱包文件
 

@@ -4,71 +4,9 @@ const {logger} = require("./function");
 class Request {
     constructor(config) {
         this.config = config;
-        this.URI = config.URI;
+        this.unisatWalletUri = config.unisatWalletUri;
+        this.mempoolUri = config.mempoolUri;
         this.networkType = config.networkType;
-    }
-
-    // 获取TX详情
-    async getTXDetail(txHash) {
-        const url = `${this.URI}/tx/${txHash}`;
-        const res = await this.request({url: url});
-        return res.data;
-    }
-
-    async getBalance(address) {
-        const url = `${this.URI}/address/${address}`;
-
-        console.log(url);
-
-        const res = await this.request({url: url});
-        // funded_txo_sum - spent_txo_sum 就是可用余额
-        //{
-        //   address: 'tb1ps2d2mfgym39ascmdj5mvyrpm9xrvjt0g7zpdq3ma7ejqxvtqyehqwh00my',
-        //   chain_stats: {
-        //     funded_txo_count: 2, // 总接受次数
-        //     funded_txo_sum: 79795, // 总接收聪
-        //     spent_txo_count: 1, // 总发送次数
-        //     spent_txo_sum: 70000, // 总发送聪
-        //     tx_count: 2, // TX总数
-        //   },
-        //   mempool_stats: { // 内存池的，就是交易已经发送，还未出块的（未确认的）
-        //     funded_txo_count: 0,
-        //     funded_txo_sum: 0,
-        //     spent_txo_count: 0,
-        //     spent_txo_sum: 0,
-        //     tx_count: 0
-        //   }
-        // }
-        if (res) {
-            return res.data;
-        }
-        return null;
-    }
-
-    // 查询 UTXO
-    async getUTXO(address) {
-        if (this.networkType === "fractal") {
-            const url = `https://wallet-api-fractal.unisat.io/v5/address/btc-utxo?address=${address}`;
-            const res = await this.request({url: url});
-            if (res.status === 200 && res.data && res.data.code === 0) {
-                return res.data.data;
-            }
-        } else if (this.networkType === "fractal_test") {
-            const url = `https://wallet-api-fractal-testnet.unisat.io/v5/address/btc-utxo?address=${address}`;
-            const res = await this.request({url: url});
-            if (res.status === 200 && res.data && res.data.code === 0) {
-                return res.data.data;
-            }
-        } else {
-            // 接口错误，换接口
-            const url = `${this.URI}/address/${address}/utxo`;
-            const res = await this.request({url: url});
-            if (res.status === 200 && res.data && res.data.code === 0) {
-                return res.data.data;
-            }
-        }
-
-        return [];
     }
 
     // 获取TX列表
@@ -79,79 +17,95 @@ class Request {
         return res.data;
     }
 
+    // 获取TX详情
+    async getTXDetail(txHash) {
+        const url = `${this.mempoolUri}/tx/${txHash}`;
+        const res = await this.request({url: url});
+        return res.data;
+    }
+
+    async getBalance(address) {
+        const url = `${this.unisatWalletUri}/v5/address/summary?address=${address}`;
+        const res = await this.request({url: url});
+        // {
+        //     "code": 0,
+        //     "msg": "ok",
+        //     "data": {
+        //         "totalSatoshis": 2533683544,
+        //         "btcSatoshis": 2525186176,
+        //         "assetSatoshis": 8497368,
+        //         "inscriptionCount": 28318,
+        //         "atomicalsCount": 0,
+        //         "brc20Count": 0,
+        //         "brc20Count5Byte": 0,
+        //         "arc20Count": 0,
+        //         "runesCount": 0
+        //     }
+        // }
+        if (res && res.data && res.data.data) {
+            return res.data.data;
+        }
+        return null;
+    }
+
+    // 查询 UTXO
+    async getUTXO(address) {
+        const url = `${this.unisatWalletUri}/v5/address/btc-utxo?address=${address}`;
+        const res = await this.request({url: url});
+        if (res.status === 200 && res.data && res.data.code === 0) {
+            return res.data.data;
+        }
+
+        return [];
+    }
 
     // 获取建议费用
     async getGas() {
-        const configFee = this.config.data.fee;
-        let gas = 0;
-        if (/^[1-9]\d*$/.test(configFee)) {
-            gas = Number(configFee)
+        const configFeeRate = this.config.data.gas;
+        let feeRate = 0;
+        if (/^\d+\.?\d*$/.test(configFeeRate)) {
+            feeRate = Number(configFeeRate)
         } else {
-            const url = `${this.URI}/v1/fees/recommended`;
+            const url = `${this.unisatWalletUri}/v5/default/fee-summary`;
             const result = await this.request({url: url});
-            const res = result.data;
-            logger().info(`当前gas (High Priority=${res.fastestFee} sat/vB), (Medium Priority=${res.halfHourFee} sat/vB), (Low Priority=${res.hourFee} sat/vB), (No Priority=${res.economyFee} sat/vB)`);
-            if (/^\+[1-9]\d*$/.test(configFee)) {
-                gas = res.fastestFee + Number(configFee);
+            const res = result.data.data.list;
+            logger().info(`当前gas (${res[0].title} = ${res[0].feeRate} sat/vB), (${res[1].title} = ${res[1].feeRate} sat/vB), (${res[2].title} = ${res[2].feeRate} sat/vB)`);
+            if (/^\+[1-9]\d*$/.test(configFeeRate)) {
+                feeRate = res[2].feeRate + Number(configFeeRate);
             } else {
-                switch (configFee) {
-                    case "medium":
-                        gas = res.halfHourFee;
-                        break;
+                switch (configFeeRate) {
                     case "low":
-                        gas = res.hourFee;
+                        feeRate = res[0].feeRate;
+                        break;
+                    case "medium":
+                        feeRate = res[1].feeRate;
                         break;
                     case "high":
-                        gas = res.fastestFee;
+                        feeRate = res[2].feeRate;
                         break;
                     default:
                         logger().warn(`config.yaml 的 gas 设置有误，默认使用 high`);
-                        gas = res.fastestFee;
+                        feeRate = res[2].feeRate;
                         break;
                 }
             }
         }
 
-        logger().info(`使用gas ${gas}`);
-        return gas;
+        logger().info(`使用gas ${feeRate}`);
+        return feeRate;
     }
 
     // 广播交易
     async broadcastTx(psbtHex) {
-        if (this.networkType === "fractal") {
-            const url = `https://wallet-api-fractal.unisat.io/v5/tx/broadcast`;
-            const res = await this.request({
-                url: url, method: 'post', body: {
-                    "rawtx": psbtHex,
-                }, headers: {
-                    'Content-Type': 'application/json',
-                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
-                    'x-address': 'bc1pasj6k7p8hy4zqpr7652svs7zq20v4zr50xy9423r4330al5r7u7qaxvy08',
-                }
-            });
-            return res.data;
-        }
-        if (this.networkType === "fractal_test") {
-            const url = `https://wallet-api-fractal-testnet.unisat.io/v5/tx/broadcast`;
-            const res = await this.request({
-                url: url, method: 'post', body: {
-                    "rawtx": psbtHex,
-                }, headers: {
-                    'Content-Type': 'application/json',
-                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
-                    'x-address': 'bc1pasj6k7p8hy4zqpr7652svs7zq20v4zr50xy9423r4330al5r7u7qaxvy08',
-                }
-            });
-            return res.data;
-        } else {
-            const url = `${this.URI}/tx`;
-            const res = await this.request({
-                url: url, method: 'post', body: psbtHex, headers: {
-                    'Content-Type': 'text/plain'
-                }
-            });
-            return res.data;
-        }
+        const url = `${this.unisatWalletUri}/v5/tx/broadcast`;
+        const res = await this.request({
+            url: url, method: 'post', body: {
+                "rawtx": psbtHex,
+            }, headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        return res.data;
     }
 
     async request({url, method = 'get', body = null, headers = null, agent = null}) {
@@ -160,11 +114,14 @@ class Request {
             method: method,
             timeout: 30 * 1000,
             headers: {
-                // 'Origin': 'https://mempool.space',
-                'Sec-Ch-Ua': '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-                'Sec-Ch-Ua-Mobile': '?0',
-                'Sec-Ch-Ua-Platform': '"Windows"',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                "accept-language": 'zh-CN,zh;q=0.9',
+                "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                "sec-ch-ua-mobile": '?0',
+                "sec-ch-ua-platform": '"Windows"',
+                "sec-fetch-dest": 'empty',
+                "sec-fetch-mode": 'cors',
+                "sec-fetch-site": 'same-origin',
+                "user-agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             },
         };
 

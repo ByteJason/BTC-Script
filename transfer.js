@@ -1,43 +1,23 @@
-const bip32 = require('bip32');
-const bip39 = require('bip39');
-const ecc = require('tiny-secp256k1');
 const bitcoin = require('bitcoinjs-lib');
-const {ECPairFactory} = require('ecpair');
-const {logger, isValidBitcoinAddress, randomNumber} = require("./utils/function");
+const {
+    exchangeRate,
+    logger,
+    isValidBitcoinAddress,
+    randomNumber,
+    getAddress,
+    getKeyPairByWif, toXOnly, isValidWif
+} = require("./utils/function");
 const AddressDataClass = require("./utils/AddressData");
 const Request = require("./utils/Request");
 const ConfigClass = require("./utils/Config");
 const readline = require('node:readline/promises');
 
-bitcoin.initEccLib(ecc);
-
 const config = new ConfigClass('./config.yaml');
 const network = config.network;
 const request = new Request(config);
 
-const exchangeRate = 1e8;
-
 // @apidoc: https://mempool.space/signet/docs/api/rest
 // @apidoc: https://mempool.fractalbitcoin.io/zh/docs/api/rest
-const toXOnly = (pubKey) => pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
-
-function getKeyPairByMnemonic(mnemonic) {
-    // 通过助记词生成种子
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
-    // 通过种子生成根秘钥
-    const root = bip32.BIP32Factory(ecc).fromSeed(seed, network);
-    // 定义路径
-    const path = "m/86'/1'/0'/0/0";
-    // 通过路径生成密钥对
-    const childNode = root.derivePath(path);
-
-    // keyPairInstance
-    return ECPairFactory(ecc).fromPrivateKey(childNode.privateKey, {network});
-}
-
-function getKeyPairByPrivateKey(privateKey) {
-    return ECPairFactory(ecc).fromWIF(privateKey, network);
-}
 
 /**
  * 计算转账的交易权重
@@ -64,66 +44,45 @@ function calculateWeight(inputCount, outputCount) {
 }
 
 // 转账
-async function transfer(keyPair, toAddresses, toAmountSATSAll) {
-    const xOnlyPubkey = toXOnly(keyPair.publicKey);
-
+async function transfer(wifString, toAddresses, toAmountSATSAll) {
+    const keyPair = getKeyPairByWif(wifString, network);
     // 发送方地址
-    const {address: fromAddress, output, witness} = bitcoin.payments.p2tr({internalPubkey: xOnlyPubkey, network});
+    let fromAddress = getAddress(wifString, config.addressType, network);
 
     // 动态查询 UTXO
-    const utxoAll = await request.getUTXO(fromAddress);
-
-    // 如果没有 UTXO，则无法进行转账，返回错误信息
-    if (utxoAll.length === 0) {
-        return 'No UTXO';
-    }
-
-    // TODO: 确认UTXO是否可用（避免误烧和金额不够）
-    let availableUTXO = [];
-    for (const utxo of utxoAll) {
-        if (utxo.value > 546 || utxo.satoshis > 546) {
-            availableUTXO.push({
-                txid: utxo.txid,
-                vout: utxo.vout,
-                value: utxo.value && utxo.value > 0 ? utxo.value : utxo.satoshis,
-            });
-        }
-    }
+    const availableUTXO = await request.getUTXO(fromAddress);
     if (availableUTXO.length === 0) {
         return 'No UTXO';
     }
 
-    // 预估 交易大小=10+输入数量×148+输出数量×34
-    let estimateSATS = 10 + (toAddresses.length + 1) * 43 + availableUTXO.length * 148;
-
     const psbt = new bitcoin.Psbt({network});
     let inputValue = 0;
 
+    const gas = await request.getGas();
+
     let utxoStr = '';
-    let i = 1;
+    let index = 1;
     for (const utxo of availableUTXO) {
-        if (inputValue < toAmountSATSAll + estimateSATS) {
-            const utxoHash = utxo.txid;
-            const input = {
-                // UTXO 的输出索引
-                index: utxo.vout,
-                // UTXO 的交易哈希
-                hash: utxoHash,
-                witnessUtxo: {
-                    // UTXO 的输出脚本
-                    script: output,
-                    // UTXO 的金额
-                    value: utxo.value,
-                },
-                tapInternalKey: xOnlyPubkey, // 添加 Taproot 内部密钥
-            };
-            psbt.addInput(input);
-
-            utxoStr += `    utxo${i}-txid: ${utxoHash}\n`
-            i++;
-
-            inputValue += utxo.value;
+        const input = {
+            index: utxo.vout,
+            hash: utxo.txid,
+            witnessUtxo: {
+                script: Buffer.from(utxo.scriptPk, 'hex'),
+                value: utxo.satoshis,
+            }
         }
+        if (config.addressType === 'p2tr') {
+            input.tapInternalKey = toXOnly(keyPair.publicKey); // 添加 Taproot 内部密钥
+        }
+        psbt.addInput(input);
+
+        utxoStr += `    utxo${index}-txid: (${utxo.txid}:${utxo.vout} ${utxo.satoshis / exchangeRate} BTC)\n`
+        inputValue += utxo.satoshis;
+
+        if (inputValue >= toAmountSATSAll + Math.ceil(gas * calculateWeight(index, toAddresses.length + 1) / 4)) {
+            break;
+        }
+        index++;
     }
 
     let outputValue = 0;
@@ -137,11 +96,8 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
         outputValue += parseInt(toAddress.Amount * exchangeRate);
     }
 
-    const gas = await request.getGas();
     // 设置 gas
-    const fee = gas * Math.ceil(calculateWeight(psbt.data.inputs.length, toAddresses.length + 1) / 4);
-    console.log(Math.ceil(calculateWeight(psbt.data.inputs.length, toAddresses.length + 1) / 4));
-
+    const fee = Math.ceil(gas * calculateWeight(psbt.data.inputs.length, toAddresses.length + 1) / 4);
     // 找零输出
     const changeValue = inputValue - outputValue - fee;
 
@@ -158,13 +114,18 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
         });
     }
 
-    const tweakedChildNode = keyPair.tweak(
-        bitcoin.crypto.taggedHash('TapTweak', xOnlyPubkey),
-    );
+    let signer = null;
+    if (config.addressType === 'p2tr') {
+        signer = keyPair.tweak(
+            bitcoin.crypto.taggedHash('TapTweak', toXOnly(keyPair.publicKey)),
+        )
+    } else {
+        signer = keyPair;
+    }
 
     // 签名所有输入
     psbt.data.inputs.forEach((input, index) => {
-        psbt.signInput(index, tweakedChildNode);
+        psbt.signInput(index, signer);
     });
 
     // // 定义验证函数，用于校验签名是否有效
@@ -200,8 +161,13 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
         // 广播交易到比特币网络，等待确认
         logger().info(`正在广播交易 hex: ${psbtHex}`);
         const res = await request.broadcastTx(psbtHex);
-        logger().success(`Transaction: ` + JSON.stringify(res));
-        return true;
+        if (res.code === 0 && res.data.length === 64) {
+            logger().success(`广播交易成功，Transaction Hash: ${res.data}`);
+            return true;
+        }
+
+        logger().error(`广播交易失败: ` + JSON.stringify(res));
+        return false;
     }
     logger().warn('取消广播交易');
     return false;
@@ -210,21 +176,25 @@ async function transfer(keyPair, toAddresses, toAmountSATSAll) {
 async function main() {
     const toAddresses = await (new AddressDataClass("wallet.csv")).load(['Address', 'Amount']);
 
-    // 支出 sBTC 的账户
-    const fromAddressWIF = config.data.wif;
-    const keyPair = getKeyPairByPrivateKey(fromAddressWIF);
+    // 支出 BTC 的账户
+    const fromAddressWIF = config.data.wif.trim();
+    if (!isValidWif(fromAddressWIF)){
+        logger().error(`wif 私钥有误: ${fromAddressWIF}`);
+        return;
+    }
 
-    const xOnlyPubkey = toXOnly(keyPair.publicKey);
-    // 发送方地址
-    const {address: fromAddress, output} = bitcoin.payments.p2tr({internalPubkey: xOnlyPubkey, network});
+    let fromAddress = getAddress(fromAddressWIF, config.addressType, network);
 
     let balance = await request.getBalance(fromAddress);
+    if (balance === null) {
+        logger().error(`获取余额失败`);
+        return;
+    }
+
     let balanceSATS = 0;
-    if (balance && balance.chain_stats) {
-        balanceSATS = balance.chain_stats.funded_txo_sum - balance.chain_stats.spent_txo_sum;
-        logger().info(`支出账户: ${fromAddress} 余额: ${balanceSATS} sat, ${balanceSATS / exchangeRate} BTC`);
-    } else {
-        logger().error(`从 RPC 获取余额失败`);
+    if (balance) {
+        balanceSATS = balance.btcSatoshis;
+        logger().info(`支出账户可用: ${fromAddress} 余额: ${balanceSATS} sat, ${balanceSATS / exchangeRate} BTC`);
     }
 
     let toAmountSATSAll = 0;
@@ -243,7 +213,7 @@ async function main() {
         toAmountSATSAll += amountSATS;
     }
 
-    if (balance.chain_stats && toAmountSATSAll > balanceSATS) {
+    if (toAmountSATSAll > balanceSATS) {
         logger().error(`${toAddresses.length} 个收款账户，共 ${toAmountSATSAll / exchangeRate} BTC ( ${toAmountSATSAll} sat ), 余额不足`);
         return
     }
@@ -252,7 +222,7 @@ async function main() {
 
     let res = false;
     try {
-        res = await transfer(keyPair, toAddresses, toAmountSATSAll);
+        res = await transfer(fromAddressWIF, toAddresses, toAmountSATSAll);
     } catch (e) {
         console.log(e);
         console.log(e.toString());

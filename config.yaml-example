@@ -1,18 +1,18 @@
-# url可选值
-# 主网: https://mempool.space/api
-# Signet: https://mempool.space/signet/api
-# Testnet3: https://mempool.space/testnet/api
-# fractal: https://mempool.fractalbitcoin.io/api
-# fractalTestnet: https://mempool-testnet.fractalbitcoin.io/api
-base_url: "https://mempool.fractalbitcoin.io/api"
+# 网络类型，可选值(mainnet, "testnet", "testnet4", "signet", "fractal", "fractal-testnet")
+networkType: "mainnet"
 
-# 暂时只支持 p2tr的地址 WIF，主网是bc1p开头，测试网是tb1p开头
-wif: ""
+# 暂时只支持 p2tr 和 p2wpkh 地址 WIF，主网是bc1开头，测试网是tb1开头
+wif: "KwPRDW2QfCqfkJSWh7Cqm7jDJV8guqcmR8vumFY53giQACzjrxDV"
+
+# 设置加速的地址，可选值("p2tr", "p2wpkh")
+# - p2tr 是 bc1p 开头的 taproot 地址
+# - p2wpkh 是 bc1q 开头的 segwit 地址
+addressType: "p2tr"
 
 # 设置的gas，可选值如下：(high medium low +n n)
-#   high: 获取区块链浏览器上的 高优先级
-#   medium: 获取区块链浏览器上的 中优先级
-#   low: 获取区块链浏览器上的 低优先级
-#   +n: n表示正整数，获取区块链浏览器上的 高优先级再加n，比如 +5，
+#   high: 获取区块链浏览器的 feeRate 高优先级
+#   medium: 获取区块链浏览器的 feeRate 中优先级
+#   low: 获取区块链浏览器的 feeRate 低优先级
+#   +n: n表示正整数，获取区块链浏览器的 feeRate 的高优先级再加n，比如 +5，
 #   n: n表示正整数，直接用 n 做gas
-fee: "high"
+gas: "high"
