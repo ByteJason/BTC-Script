@@ -241,7 +241,7 @@ function isValidBitcoinAddress(address, network) {
         }
 
         // 检查数据部分的长度和类型
-        if (address.startsWith('bc1p')) {
+        if (address.startsWith('bc1p')  || address.startsWith('tb1p') ) {
             // P2TR 地址的版本号为 1，数据长度为 32 字节
             return decoded.version === 1 && decoded.data.length === 32;
         } else if (address.startsWith('bc1q')) {
