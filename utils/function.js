@@ -219,6 +219,29 @@ function getAddress(wifString, addressType, network) {
     return fromAddress
 }
 
+/**
+ * 计算转账的交易权重
+ * @param inputCount
+ * @param outputCount
+ * @returns {*}
+ */
+function calculateWeight(inputCount, outputCount) {
+    // 定义每个部分的大小（以字节为单位）
+    const baseTransactionSize = 10;    // 包含版本号和锁定时间，通常为10字节
+    const inputNonWitnessSize = 70;    // 每个输入的非 Witness 大小
+    const outputSize = 58;             // 每个输出的大小
+
+    let nonWitnessSize = baseTransactionSize + (inputCount * inputNonWitnessSize) + (outputCount * outputSize);
+
+    // TODO: 需要根据地址类型判断大小
+    // Witness 数据大小
+    const p2wpkhWitnessDataSize = 105; // 普通 P2WPKH Witness 数据大小（签名 + 公钥）
+    const p2trWitnessDataSize = 64;    // P2TR Witness 数据大小（Schnorr 签名）
+    let totalWitnessSize = inputCount * p2trWitnessDataSize; // 计算 Witness 大小
+
+    // 计算交易的总 weight
+    return 3 * nonWitnessSize + totalWitnessSize;
+}
 
 /**
  * 验证比特币地址的合法性
@@ -253,6 +276,7 @@ function isValidBitcoinAddress(address, network) {
 }
 
 module.exports = {
+    exchangeRate,
     sleep,
     randomNumber,
     shuffle,
@@ -265,6 +289,6 @@ module.exports = {
     toXOnly,
     getAddress,
     isValidWif,
-    exchangeRate,
+    calculateWeight,
 }
 
