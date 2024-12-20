@@ -227,34 +227,29 @@ function getAddress(wifString, addressType, network) {
  * @returns {boolean} - 返回地址是否合法
  */
 function isValidBitcoinAddress(address, network) {
-    try {
-        // 解析比特币地址
-        const decoded = bitcoin.address.fromBech32(address);
+    const rules = network === bitcoin.networks.bitcoin ?
+        [
+            {type: 'P2WPKH', prefix: 'bc1q', length: 42},
+            {type: 'P2SH-P2WPKH', prefix: '3', length: 34},
+            {type: 'P2TR', prefix: 'bc1p', length: 62},
+            {type: 'P2PKH', prefix: '1', length: 34},
+        ] :
+        [
+            {type: 'P2WPKH', prefix: 'tb1q', length: 42},
+            {type: 'P2SH-P2WPKH', prefix: '2', length: 35},
+            {type: 'P2TR', prefix: 'tb1p', length: 62},
+            {type: 'P2PKH', prefix: 'm', length: 34},
+        ];
 
-        // 检查地址前缀和版本号
-        if (network === bitcoin.networks.bitcoin) {
-            if (decoded.prefix !== 'bc') return false;
-        } else if (network === bitcoin.networks.testnet) {
-            if (decoded.prefix !== 'tb') return false;
-        } else {
-            return false;
+    // 校验地址
+    for (const rule of rules) {
+        if (address.startsWith(rule.prefix) && address.length === rule.length) {
+            return true;
         }
-
-        // 检查数据部分的长度和类型
-        if (address.startsWith('bc1p')  || address.startsWith('tb1p') ) {
-            // P2TR 地址的版本号为 1，数据长度为 32 字节
-            return decoded.version === 1 && decoded.data.length === 32;
-        } else if (address.startsWith('bc1q')) {
-            // P2WPKH 地址的版本号为 0，数据长度为 20 字节
-            // P2WSH 地址的版本号为 0，数据长度为 32 字节
-            return decoded.version === 0 && (decoded.data.length === 20 || decoded.data.length === 32);
-        }
-
-        return false;
-    } catch (e) {
-        // 捕获解析错误，返回地址不合法
-        return false;
     }
+
+    // 地址不符合任何规则
+    return false;
 }
 
 module.exports = {
